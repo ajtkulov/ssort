@@ -24,3 +24,5 @@ libraryDependencies ++= Seq(
   "org.scala-lang" % "scala-reflect" % scalaVersion.value, // Add scala-reflect dependency
   "org.scalatest" %% "scalatest" % "3.2.9" % Test
 )
+
+libraryDependencies += "org.rogach" %% "scallop" % "5.1.0"
