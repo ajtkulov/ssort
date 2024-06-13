@@ -26,3 +26,8 @@ libraryDependencies ++= Seq(
 )
 
 libraryDependencies += "org.rogach" %% "scallop" % "5.1.0"
+
+lazy val app = (project in file("."))
+  .settings(
+    assembly / assemblyJarName := "ssort.jar"
+  )

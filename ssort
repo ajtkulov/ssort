@@ -1,0 +1,3 @@
+java -Xmx20000m -jar ssort.jar --input $1 --output $2
+
+#java -Xmx20000m -jar ssort.jar --input $1 --output $2 --blocksize 300000000
