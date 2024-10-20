@@ -4,7 +4,7 @@ import sort.FileUtils
 
 import scala.collection.mutable.ArrayBuffer
 import java.io._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContextExecutorService, Future}
 import scala.concurrent.duration.Duration
 import java.io.FileOutputStream
 import org.rogach.scallop._
@@ -179,14 +179,12 @@ class Conf(arguments: Seq[String]) extends ScallopConf(arguments) {
   val input = opt[String](required = true)
   val output = opt[String](required = true)
   val blocksize = opt[Int]()
+  val threads = opt[Int]()
   verify()
 }
 
 object Main extends App {
-
-  import scala.concurrent.ExecutionContext.Implicits.global
-
-  def sortFile(inputFile: String, blockSize: Int): Int = {
+  def sortFile(inputFile: String, blockSize: Int)(implicit ec: ExecutionContextExecutorService): Int = {
     val futures: ArrayBuffer[Future[Unit]] = ArrayBuffer[Future[Unit]]()
     val size: Long = FileUtils.fileSize(inputFile)
     val file = new RandomAccessFile(inputFile, "r")
@@ -230,6 +228,7 @@ object Main extends App {
     val blockSize: Int = conf.blocksize.getOrElse(500000009).toInt
     val input = conf.input.get.get
     val output = conf.output.get.get
+    implicit val ec = ExecutionPool.createExecutionContext(conf.threads.getOrElse(8))
 
     val chunks: Int = sortFile(input, blockSize)
 
