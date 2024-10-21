@@ -9,11 +9,13 @@ import scala.concurrent.duration.Duration
 import java.io.FileOutputStream
 import org.rogach.scallop._
 
+import java.util.concurrent.atomic.AtomicInteger
+
 case class Batch(file: RandomAccessFile, offset: Long, size: Long, outputFileName: String, idx: Int, blockSize: Int) {
   var len = blockSize
-  val newLines = ArrayBuffer[Int](-1)
-  var newAr: Array[Int] = null
-  var buffer = new Array[Byte](blockSize)
+  @volatile var newLines = ArrayBuffer[Int](-1)
+  @volatile var newAr: Array[Int] = null
+  @volatile var buffer = new Array[Byte](blockSize)
   var isEnd = false
   var bytesRead: Int = 0
 
@@ -72,7 +74,10 @@ case class Batch(file: RandomAccessFile, offset: Long, size: Long, outputFileNam
   }
 
   def customFinalize() = {
+    file.close()
     buffer = null
+    newAr = null
+    newLines = null
   }
 }
 
@@ -187,14 +192,21 @@ object Main extends App {
   def sortFile(inputFile: String, blockSize: Int)(implicit ec: ExecutionContextExecutorService): Int = {
     val futures: ArrayBuffer[Future[Unit]] = ArrayBuffer[Future[Unit]]()
     val size: Long = FileUtils.fileSize(inputFile)
-    val file = new RandomAccessFile(inputFile, "r")
 
     var idx = 0
     var offset = 0L
     var isEnd: Boolean = false
 
+    val readCnt: AtomicInteger = new AtomicInteger(0)
+    val doneCnt: AtomicInteger = new AtomicInteger(0)
+
     while (!isEnd) {
-      val b = Batch(file, offset, size, inputFile, idx, blockSize)
+      while (readCnt.get() - doneCnt.get() > 6) {
+        println(s"read: ${readCnt.get()} - done: ${doneCnt.get()}")
+        Thread.sleep(1000)
+      }
+
+      val b = Batch(new RandomAccessFile(inputFile, "r"), offset, size, inputFile, idx, blockSize)
       idx = idx + 1
 
       b.read()
@@ -202,10 +214,13 @@ object Main extends App {
       b.init()
       offset = offset + b.len + 1
 
+      readCnt.incrementAndGet()
+
       val f = Future {
         b.internalSort()
         b.write()
         b.customFinalize()
+        doneCnt.incrementAndGet()
         System.gc()
       }
       futures.append(f)
@@ -213,6 +228,7 @@ object Main extends App {
 
     for (f <- futures) {
       Await.result(f, Duration.Inf)
+      System.gc()
     }
 
     futures.size
@@ -228,7 +244,7 @@ object Main extends App {
     val blockSize: Int = conf.blocksize.getOrElse(500000009).toInt
     val input = conf.input.get.get
     val output = conf.output.get.get
-    implicit val ec = ExecutionPool.createExecutionContext(conf.threads.getOrElse(8))
+    implicit val ec = ExecutionPool.createExecutionContext(conf.threads.getOrElse(4))
 
     val chunks: Int = sortFile(input, blockSize)
 
