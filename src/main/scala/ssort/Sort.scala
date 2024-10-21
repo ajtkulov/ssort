@@ -133,8 +133,7 @@ class FileIterator(val fileName: String, val offset: Int = 0, val bufferSize: In
 }
 
 class MergeSort(inputFileName: String, chunks: Int, outputFileName: String) {
-
-  val outputStream = new FileOutputStream(outputFileName)
+  val outputStream = new BufferedOutputStream(new FileOutputStream(outputFileName), 65536)
   val heap = scala.collection.mutable.PriorityQueue[StringWrap]()(StringWrapOrdering.ordering)
   val files = (0 until chunks).map(x => s"$inputFileName.$x").toVector
   val fileMap = new Array[FileIterator](chunks)
